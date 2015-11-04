@@ -4,7 +4,7 @@ setup(
     name='Aperture_calculator',
     version='0.0',
     packages=[''],
-    url='',
+    url='https://github.com/CatdBD/Aperture_calc',
     license='',
     author='Catherine de Burgh-Day',
     author_email='catherine.dbd@gmail.com',

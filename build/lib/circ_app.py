@@ -3,9 +3,9 @@ A program to compute exactly what fraction of an
 array of pixels falls inside a circular aperture.
 
 Call as:
-circ_app.circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_marker_size=5000)
+[all_x, all_y, all_A] = circ_app.circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_marker_size=5000)
 
-Inputs:
+args:
 - arrs: Tuple of x and y indexes (from np.meshgrid)
 - circle_loc: Tuple containing the x and y coordinate of the
 centre of the circle (in pixel units)
@@ -16,11 +16,12 @@ circle is returned. Otherwise, the area is returned. Default is True.
  - plot - if True an image is produced which shows the fractions of each pixel
  inside the aperture. Default is False.
  - plot_marker_size - determines the marker size used in the optional plot.
-
-Returns:
+output:
 - all_x: The x-coordinates of the pixels in a 1-D list
 - all_y: The y-coordinates of the pixels in a 1-D list
 - all_A: The Area or fraction of each pixel falling inside the aperture
+
+Writen by Catherine de Burgh-Day. Contact: catherine.dbd@gmail.com
 
 '''
 import numpy as np
