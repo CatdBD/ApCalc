@@ -3,7 +3,8 @@ A program to compute exactly what fraction of an
 array of pixels falls inside a circular aperture.
 
 Call as:
-[all_x, all_y, all_A] = circ_app.circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_marker_size=5000)
+[all_x, all_y, all_a] = circ_app.circular_aperture(arrs, circle_loc, rcirc,
+                        normalize=True, plot=False, plot_marker_size=5000)
 
 args:
 - arrs: Tuple of x and y indexes (from np.meshgrid)
@@ -19,11 +20,17 @@ circle is returned. Otherwise, the area is returned. Default is True.
 output:
 - all_x: The x-coordinates of the pixels in a 1-D list
 - all_y: The y-coordinates of the pixels in a 1-D list
-- all_A: The Area or fraction of each pixel falling inside the aperture
+- all_a: The area or fraction of each pixel falling inside the aperture
 
 Writen by Catherine de Burgh-Day. Contact: catherine.dbd@gmail.com
 
 '''
+
+# The below command disables any errors pertaining to missing module attributes.
+# This is here becuase pylint has a bug where it can't find module attributes properly!
+# pylint: disable=E
+# Delete this line (not just comment - it works while commented) to see all errors with pylint
+
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -32,7 +39,12 @@ __author__ = 'Catherine de Burgh-Day'
 
 
 def rescale_array(arr):
-    """ Rescale or normalise an array to be between 0 and 1"""
+    """
+    Rescale or normalise an array to be between 0 and 1
+
+    :param arr:
+    :return:
+    """
     arr = np.array(arr)
     arr_shape = arr.shape
     arr = arr.flatten()
@@ -45,30 +57,49 @@ def rescale_array(arr):
     return scaled_arr
 
 
-def intersect(vertA, vertB, circle_rad):
-    # (based on http://mathworld.wolfram.com/Circle-LineIntersection.html)
-    vertAx, vertAy = vertA
-    vertBx, vertBy = vertB
-    dx = vertBx - vertAx
-    dy = vertBy - vertAy
-    dr = np.sqrt(dx ** 2 + dy ** 2)
-    D = vertAx * vertBy - vertBx * vertAy
+def intersect(vert_a, vert_b, circle_rad):
+    """
+    Identifies the intersects
+    between a circle and a square
+    (based on http://mathworld.wolfram.com/Circle-LineIntersection.html)
+
+    :param vert_a:
+    :param vert_b:
+    :param circle_rad:
+    :return:
+    """
+    vert_a_x, vert_a_y = vert_a
+    vert_b_x, vert_b_y = vert_b
+    delta_x = vert_b_x - vert_a_x
+    delta_y = vert_b_y - vert_a_y
+    delta_r = np.sqrt(delta_x ** 2 + delta_y ** 2)
+    discriminant = vert_a_x * vert_b_y - vert_b_x * vert_a_y
 
     # Do this because np.sign(0.0) = 0.0 (not 1.0 or -1.0)
-    sdy = dy
-    if dy == 0.0:
+    sdy = delta_y
+    if delta_y == 0.0:
         sdy = 1.
     sign_dy = np.sign(sdy)
 
-    intx_1 = (1 / dr ** 2) * (D * dy - sign_dy * dx * np.sqrt((circle_rad ** 2) * (dr ** 2) - (D ** 2)))
-    intx_2 = (1 / dr ** 2) * (D * dy + sign_dy * dx * np.sqrt((circle_rad ** 2) * (dr ** 2) - (D ** 2)))
+    intx_1 = (1 / delta_r ** 2)\
+             * (discriminant * delta_y - sign_dy * delta_x
+                * np.sqrt((circle_rad ** 2)
+                          * (delta_r ** 2) - (discriminant ** 2)))
+    intx_2 = (1 / delta_r ** 2)\
+             * (discriminant * delta_y + sign_dy * delta_x
+                * np.sqrt((circle_rad ** 2)
+                          * (delta_r ** 2) - (discriminant ** 2)))
 
-    inty_1 = (1 / dr ** 2) * (-D * dx + abs(dy) * np.sqrt((circle_rad ** 2) * (dr ** 2) - (D ** 2)))
-    inty_2 = (1 / dr ** 2) * (-D * dx - abs(dy) * np.sqrt((circle_rad ** 2) * (dr ** 2) - (D ** 2)))
+    inty_1 = (1 / delta_r ** 2) * (-discriminant * delta_x + abs(delta_y)
+                              * np.sqrt((circle_rad ** 2) * (delta_r ** 2)
+                                        - (discriminant ** 2)))
+    inty_2 = (1 / delta_r ** 2) * (-discriminant * delta_x - abs(delta_y)
+                              * np.sqrt((circle_rad ** 2) * (delta_r ** 2)
+                                        - (discriminant ** 2)))
 
-    Delta = (circle_rad ** 2) * (dr ** 2) - (D ** 2)
+    delta = (circle_rad ** 2) * (delta_r ** 2) - (discriminant ** 2)
 
-    if Delta > 0:
+    if delta > 0:
         is_int = True
     else:
         is_int = False
@@ -89,42 +120,78 @@ def intersect(vertA, vertB, circle_rad):
     return intx_pos, intx_neg, inty_pos, inty_neg, is_int
 
 
-def Circular_Seg(intA, intB, circle_rad):
-    intAx, intAy = intA
-    intBx, intBy = intB
-    d = np.sqrt((intAx - intBx) ** 2 + (intAy - intBy) ** 2)
-    angle = 2.0 * np.arcsin(0.5 * d / circle_rad)
-    A_circ_seg = abs(0.5 * (circle_rad ** 2) * (angle - np.sin(angle)))
-    return A_circ_seg
+def circular_seg(int_a, int_b, circle_rad):
+    """
+    Computes the area of a circular segment
+
+    :param int_a:
+    :param int_b:
+    :param circle_rad:
+    :return:
+    """
+    int_a_x, int_a_y = int_a
+    int_b_x, int_b_y = int_b
+    distance = np.sqrt((int_a_x - int_b_x) ** 2 + (int_a_y - int_b_y) ** 2)
+    angle = 2.0 * np.arcsin(0.5 * distance / circle_rad)
+    a_circ_seg = abs(0.5 * (circle_rad ** 2) * (angle - np.sin(angle)))
+    return a_circ_seg
 
 
-def Triangle(vertA, vertB, vertC):
-    vertAx, vertAy = vertA
-    vertBx, vertBy = vertB
-    vertCx, vertCy = vertC
-    A_tri = abs((vertAx * (vertBy - vertCy) +
-                 vertBx * (vertCy - vertAy) +
-                 vertCx * (vertAy - vertBy)) / 2.0)
-    # Area = (1/2)b*h
+def triangle(vert_a, vert_b, vert_c):
+    """
+    Computes the area of a triangle
+
+    :param vert_a:
+    :param vert_b:
+    :param vert_c:
+    :return:
+    """
+    vert_a_x, vert_a_y = vert_a
+    vert_b_x, vert_b_y = vert_b
+    vert_c_x, vert_c_y = vert_c
+    a_tri = abs((vert_a_x * (vert_b_y - vert_c_y) +
+                 vert_b_x * (vert_c_y - vert_a_y) +
+                 vert_c_x * (vert_a_y - vert_b_y)) / 2.0)
+    # area = (1/2)b*h
     #      /\A
     #     /  \
     #    /    \
     #  B/______\C
 
-    return A_tri
+    return a_tri
 
 
-def Rectangle(vertA, vertD):
-    # vert A and D must be opposite i.e. 1 and 3 or 2 and 4
-    vertAx, vertAy = vertA
-    vertDx, vertDy = vertD
-    len_w = abs(vertDx - vertAx)
-    len_h = abs(vertDy - vertAy)
-    A_rect = abs(len_w * len_h)
-    return A_rect
+def rectangle(vert_a, vert_d):
+    """
+    Computes the area of a rectangle
+    vert_A and vert_D must be opposite i.e. 1 and 3 or 2 and 4
+
+    :param vert_a:
+    :param vert_d:
+    :return:
+    """
+
+    vert_a_x, vert_a_y = vert_a
+    vert_d_x, vert_d_y = vert_d
+    len_w = abs(vert_d_x - vert_a_x)
+    len_h = abs(vert_d_y - vert_a_y)
+    a_rect = abs(len_w * len_h)
+    return a_rect
 
 def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_marker_size=500):
-    square_size=plot_marker_size
+    """
+    The main function to compute the fraction of an
+    array of pixels which fall within a circular aperture
+
+    :param arrs:
+    :param circle_loc:
+    :param rcirc:
+    :param normalize:
+    :param plot:
+    :param plot_marker_size:
+    :return:
+    """
+    square_size = plot_marker_size
     xarr, yarr = arrs
     offsetx, offsety = circle_loc
     sizex, sizey = xarr.shape
@@ -168,32 +235,32 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
     smallest_verty = np.zeros_like(yarr)
     for i in xrange(sizex):
         for j in xrange(sizey):
-            xi = xarr[i, j]
-            yj = yarr[i, j]
-            if xi >= 0:
-                if yj >= 0:
+            x_i = xarr[i, j]
+            y_j = yarr[i, j]
+            if x_i >= 0:
+                if y_j >= 0:
                     # then 4 for biggest
                     biggest_vertx[i, j] = vert4x[i, j]
                     biggest_verty[i, j] = vert4y[i, j]
                     # then 2 for smallest
                     smallest_vertx[i, j] = vert2x[i, j]
                     smallest_verty[i, j] = vert2y[i, j]
-                elif yj < 0:
+                elif y_j < 0:
                     # then 3 for biggest
                     biggest_vertx[i, j] = vert3x[i, j]
                     biggest_verty[i, j] = vert3y[i, j]
                     # then 1 for smallest
                     smallest_vertx[i, j] = vert1x[i, j]
                     smallest_verty[i, j] = vert1y[i, j]
-            elif xi < 0:
-                if yj > 0:
+            elif x_i < 0:
+                if y_j > 0:
                     # then 1 for biggest
                     biggest_vertx[i, j] = vert1x[i, j]
                     biggest_verty[i, j] = vert1y[i, j]
                     # then 3 for smallest
                     smallest_vertx[i, j] = vert3x[i, j]
                     smallest_verty[i, j] = vert3y[i, j]
-                elif yj < 0:
+                elif y_j < 0:
                     # then 2 for biggest
                     biggest_vertx[i, j] = vert2x[i, j]
                     biggest_verty[i, j] = vert2y[i, j]
@@ -218,7 +285,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
     # This case deals with where the aperture edge crosses many pixels,
     # and where the aperture is small and sits on the intersection of four pixels
     if ((pix_sizex < rcirc and pix_sizey < rcirc) or not
-    ((rvert1.any() < rcirc) or (rvert2.any() < rcirc) or (rvert3.any() < rcirc) or (rvert4.any() < rcirc))):
+        ((rvert1.any() < rcirc) or (rvert2.any() < rcirc) or
+         (rvert3.any() < rcirc) or (rvert4.any() < rcirc))):
         print "The circle is bigger than the pixels and/or covers more than two "
         outer_inside = np.where(biggest_rarr < rcirc, 1., np.nan)
         outer_outside = np.where(biggest_rarr > rcirc, 1., np.nan)
@@ -293,7 +361,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             to_do = (np.array(the_col_locs), np.array(the_row_loc))
             # yarr goes col by row, so to the the row no. we go mod(flattened index,xshape of arr)
             # e.g. [3%6, 9%6] = [3,3] --> 4th row (indexing from zero)
-            to_do = ([to_do_i for to_do_i in to_do[0]], [to_do_i % rarr.shape[1] for to_do_i in to_do[1]])
+            to_do = ([to_do_i for to_do_i in to_do[0]],
+                     [to_do_i % rarr.shape[1] for to_do_i in to_do[1]])
 
         elif test23s.any() or test14s.any():
             the_col_loc = np.where((vert1x.flatten() < 0) & (vert4x.flatten() > 0))[0][:2]
@@ -309,7 +378,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # xarr goes row by col, so to the the row no. we go int(flattened index/xshape of arr)
             # e.g. [18./6, 19./6] = [3.0,3.166666..], whereas [int(18/6), int(19/6)] = [3,3]
             # --> 4th col. (indexing from 0)
-            to_do = ([int(to_do_i / rarr.shape[0]) for to_do_i in to_do[0]], [to_do_i for to_do_i in to_do[1]])
+            to_do = ([int(to_do_i / rarr.shape[0]) for to_do_i in to_do[0]],
+                     [to_do_i for to_do_i in to_do[1]])
             # print the_row, the_pix_locs, xarr[:,0].flatten()[the_pix_locs]
 
         else:
@@ -347,12 +417,12 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
     # plt.clf()
     # plt.close()
     # fig = plt.figure()
-    # ax = fig.add_subplot(111, aspect='equal')
-    # ax.scatter(xarr[to_do] + offsetx, yarr[to_do] + offsety, 200, c='g', marker='o')
-    # ax.scatter(xarr + offsetx, yarr + offsety, square_size, c='k', marker='s')
-    # ax.scatter(xarr + offsetx, yarr + offsety, 200, c='k', marker='.')
+    # axis = fig.add_subplot(111, aspect='equal')
+    # axis.scatter(xarr[to_do] + offsetx, yarr[to_do] + offsety, 200, c='g', marker='o')
+    # axis.scatter(xarr + offsetx, yarr + offsety, square_size, c='k', marker='s')
+    # axis.scatter(xarr + offsetx, yarr + offsety, 200, c='k', marker='.')
     # circ = plt.Circle([offsetx, offsety], rcirc, color='r', linewidth=3, fill=None)
-    # ax.add_patch(circ)
+    # axis.add_patch(circ)
     # plt.savefig('debug.png')
 
     #################################
@@ -401,8 +471,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
         plt.clf()
         plt.close()
         fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
-        ax.scatter(xarr + offsetx, yarr + offsety, square_size, c='w', marker='s')
+        axis = fig.add_subplot(111, aspect='equal')
+        axis.scatter(xarr + offsetx, yarr + offsety, square_size, c='w', marker='s')
 
     # Now we do the complicated bit: Individually computing the different ways
     #  in which a circle can cross a square!
@@ -427,18 +497,19 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
         # 2 --------- 3
 
         # Compute the pixel-circle intercepts
-        int12x_pos, int12x_neg, int12y_pos, int12y_neg, test12 = intersect([vert1x_todo[i], vert1y_todo[i]],
-                                                                           [vert2x_todo[i], vert2y_todo[i]],
-                                                                           rcirc)
-        int23x_pos, int23x_neg, int23y_pos, int23y_neg, test23 = intersect([vert2x_todo[i], vert2y_todo[i]],
-                                                                           [vert3x_todo[i], vert3y_todo[i]],
-                                                                           rcirc)
-        int34x_pos, int34x_neg, int34y_pos, int34y_neg, test34 = intersect([vert3x_todo[i], vert3y_todo[i]],
-                                                                           [vert4x_todo[i], vert4y_todo[i]],
-                                                                           rcirc)
-        int41x_pos, int41x_neg, int41y_pos, int41y_neg, test41 = intersect([vert4x_todo[i], vert4y_todo[i]],
-                                                                           [vert1x_todo[i], vert1y_todo[i]],
-                                                                           rcirc)
+        int12x_pos, int12x_neg, int12y_pos, int12y_neg, test12\
+            = intersect([vert1x_todo[i], vert1y_todo[i]],
+                        [vert2x_todo[i], vert2y_todo[i]], rcirc)
+        int23x_pos, int23x_neg, int23y_pos, int23y_neg, test23\
+            = intersect([vert2x_todo[i], vert2y_todo[i]],
+                        [vert3x_todo[i], vert3y_todo[i]], rcirc)
+        int34x_pos, int34x_neg, int34y_pos, int34y_neg, test34\
+            = intersect([vert3x_todo[i], vert3y_todo[i]],
+                        [vert4x_todo[i], vert4y_todo[i]], rcirc)
+        int41x_pos, int41x_neg, int41y_pos, int41y_neg, test41\
+            = intersect([vert4x_todo[i], vert4y_todo[i]],
+                        [vert1x_todo[i], vert1y_todo[i]], rcirc)
+
         intersects = [[int12x_pos, int12x_neg, int12y_pos, int12y_neg],
                       [int23x_pos, int23x_neg, int23y_pos, int23y_neg],
                       [int34x_pos, int34x_neg, int34y_pos, int34y_neg],
@@ -447,11 +518,11 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
         # Check each possible scenario....
         if vert1_outside and vert2_inside and vert3_inside and vert4_inside:
             # print 'case1'
-            A_sm = Circular_Seg([int12x_pos, int12y_pos], [int41x_neg, int41y_neg], rcirc)
-            A_tr = Triangle([int12x_pos, int12y_pos], [int41x_neg, int41y_neg],
+            a_sm = circular_seg([int12x_pos, int12y_pos], [int41x_neg, int41y_neg], rcirc)
+            a_tr = triangle([int12x_pos, int12y_pos], [int41x_neg, int41y_neg],
                             [vert1x_todo[i], vert1y_todo[i]])
-            A_rect = Rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
-            Area = A_rect - A_tr + A_sm
+            a_rect = rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
+            area = a_rect - a_tr + a_sm
             #      + + + +
             #   1+_______4 +
             #   +        |   +
@@ -463,11 +534,11 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and outside triangle and area of pixel
         elif vert2_outside and vert1_inside and vert3_inside and vert4_inside:
             # print 'case2'
-            A_sm = Circular_Seg([int12x_neg, int12y_neg], [int23x_neg, int23y_neg], rcirc)
-            A_tr = Triangle([int12x_neg, int12y_neg], [int23x_neg, int23y_neg],
+            a_sm = circular_seg([int12x_neg, int12y_neg], [int23x_neg, int23y_neg], rcirc)
+            a_tr = triangle([int12x_neg, int12y_neg], [int23x_neg, int23y_neg],
                             [vert2x_todo[i], vert2y_todo[i]])
-            A_rect = Rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
-            Area = A_rect - A_tr + A_sm
+            a_rect = rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
+            area = a_rect - a_tr + a_sm
             #      + + + +
             #    +         +
             #  +            +
@@ -479,11 +550,11 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and outside triangle and area of pixel
         elif vert3_outside and vert1_inside and vert2_inside and vert4_inside:
             # print 'case3'
-            A_sm = Circular_Seg([int23x_pos, int23y_pos], [int34x_pos, int34y_neg], rcirc)
-            A_tr = Triangle([int23x_pos, int23y_pos], [int34x_pos, int34y_neg],
+            a_sm = circular_seg([int23x_pos, int23y_pos], [int34x_pos, int34y_neg], rcirc)
+            a_tr = triangle([int23x_pos, int23y_pos], [int34x_pos, int34y_neg],
                             [vert3x_todo[i], vert3y_todo[i]])
-            A_rect = Rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
-            Area = A_rect - A_tr + A_sm
+            a_rect = rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
+            area = a_rect - a_tr + a_sm
             #      + + + +
             #    +          +
             #   +            +
@@ -495,11 +566,11 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and outside triangle and area of pixel
         elif vert4_outside and vert1_inside and vert2_inside and vert3_inside:
             # print 'case4'
-            A_sm = Circular_Seg([int41x_pos, int41y_pos], [int34x_pos, int34y_pos], rcirc)
-            A_tr = Triangle([int41x_pos, int41y_pos], [int34x_pos, int34y_pos],
+            a_sm = circular_seg([int41x_pos, int41y_pos], [int34x_pos, int34y_pos], rcirc)
+            a_tr = triangle([int41x_pos, int41y_pos], [int34x_pos, int34y_pos],
                             [vert4x_todo[i], vert4y_todo[i]])
-            A_rect = Rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
-            Area = A_rect - A_tr + A_sm
+            a_rect = rectangle([vert1x_todo[i], vert1y_todo[i]], [vert3x_todo[i], vert3y_todo[i]])
+            area = a_rect - a_tr + a_sm
             #      + + + +
             #    +  1_______+4
             #   +   |        +
@@ -511,12 +582,12 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and outside triangle and area of pixel
         elif vert2_outside and vert3_outside and vert1_inside and vert4_inside:
             # print 'case5'
-            A_sm = Circular_Seg([int34x_pos, int34y_neg], [int12x_pos, int12y_neg], rcirc)
-            A_tr1 = Triangle([int34x_pos, int34y_neg], [int12x_pos, int12y_neg],
+            a_sm = circular_seg([int34x_pos, int34y_neg], [int12x_pos, int12y_neg], rcirc)
+            a_tr1 = triangle([int34x_pos, int34y_neg], [int12x_pos, int12y_neg],
                              [vert4x_todo[i], vert4y_todo[i]])
-            A_tr2 = Triangle([vert1x_todo[i], vert1y_todo[i]], [int12x_pos, int12y_neg],
+            a_tr2 = triangle([vert1x_todo[i], vert1y_todo[i]], [int12x_pos, int12y_neg],
                              [vert4x_todo[i], vert4y_todo[i]])
-            Area = A_sm + A_tr1 + A_tr2
+            area = a_sm + a_tr1 + a_tr2
             #      + + + +
             #    +         +
             #   +            +
@@ -529,11 +600,12 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and two triangles
         elif vert3_outside and vert4_outside and vert1_inside and vert2_inside:
             # print 'case6'
-            A_sm = Circular_Seg([int41x_pos, int41y_pos], [int23x_pos, int23y_pos], rcirc)
-            A_tr1 = Triangle([int41x_pos, int41y_pos], [int23x_pos, int23y_pos], [vert2x_todo[i], vert2y_todo[i]])
-            A_tr2 = Triangle([vert1x_todo[i], vert1y_todo[i]], [int41x_pos, int41y_pos],
+            a_sm = circular_seg([int41x_pos, int41y_pos], [int23x_pos, int23y_pos], rcirc)
+            a_tr1 = triangle([int41x_pos, int41y_pos],
+                             [int23x_pos, int23y_pos], [vert2x_todo[i], vert2y_todo[i]])
+            a_tr2 = triangle([vert1x_todo[i], vert1y_todo[i]], [int41x_pos, int41y_pos],
                              [vert2x_todo[i], vert2y_todo[i]])
-            Area = A_sm + A_tr1 + A_tr2
+            area = a_sm + a_tr1 + a_tr2
             #      + + + +
             #    +          +
             #   +       1____+___4
@@ -545,9 +617,10 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and two triangles
         elif vert2_outside and vert3_outside and vert4_outside and vert1_inside:
             # print 'case7'
-            A_sm = Circular_Seg([int41x_pos, int41y_pos], [int12x_pos, int12y_neg], rcirc)
-            A_tr = Triangle([int41x_pos, int41y_pos], [int12x_pos, int12y_neg], [vert1x_todo[i], vert1y_todo[i]])
-            Area = A_sm + A_tr
+            a_sm = circular_seg([int41x_pos, int41y_pos], [int12x_pos, int12y_neg], rcirc)
+            a_tr = triangle([int41x_pos, int41y_pos],
+                            [int12x_pos, int12y_neg], [vert1x_todo[i], vert1y_todo[i]])
+            area = a_sm + a_tr
             #     +++++
             #   +       +
             #  +      1__+____4
@@ -558,11 +631,12 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and triangle
         elif vert1_outside and vert4_outside and vert2_inside and vert3_inside:
             # print 'case8'
-            A_sm = Circular_Seg([int12x_pos, int12y_pos], [int34x_pos, int34y_pos], rcirc)
-            A_tr1 = Triangle([int12x_pos, int12y_pos], [int34x_pos, int34y_pos], [vert2x_todo[i], vert2y_todo[i]])
-            A_tr2 = Triangle([vert3x_todo[i], vert3y_todo[i]], [int34x_pos, int34y_pos],
+            a_sm = circular_seg([int12x_pos, int12y_pos], [int34x_pos, int34y_pos], rcirc)
+            a_tr1 = triangle([int12x_pos, int12y_pos],
+                             [int34x_pos, int34y_pos], [vert2x_todo[i], vert2y_todo[i]])
+            a_tr2 = triangle([vert3x_todo[i], vert3y_todo[i]], [int34x_pos, int34y_pos],
                              [vert2x_todo[i], vert2y_todo[i]])
-            Area = A_sm + A_tr1 + A_tr2
+            area = a_sm + a_tr1 + a_tr2
             #     1________4
             #     |        |
             #     |+ + + + |
@@ -576,9 +650,10 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and two triangles
         elif vert1_outside and vert3_outside and vert4_outside and vert2_inside:
             # print 'case9'
-            A_sm = Circular_Seg([int23x_pos, int23y_pos], [int12x_pos, int12y_pos], rcirc)
-            A_tr = Triangle([int23x_pos, int23y_pos], [int12x_pos, int12y_pos], [vert2x_todo[i], vert2y_todo[i]])
-            Area = A_sm + A_tr
+            a_sm = circular_seg([int23x_pos, int23y_pos], [int12x_pos, int12y_pos], rcirc)
+            a_tr = triangle([int23x_pos, int23y_pos],
+                            [int12x_pos, int12y_pos], [vert2x_todo[i], vert2y_todo[i]])
+            area = a_sm + a_tr
             #		  1_______4
             #		  |       |
             #     +++++       |
@@ -590,8 +665,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and triangle
         elif vert1_outside and vert2_outside and vert3_outside and vert4_outside and test12:
             # print 'case10'
-            A_sm = Circular_Seg([int12x_pos, int12y_pos], [int12x_pos, int12y_neg], rcirc)
-            Area = A_sm
+            a_sm = circular_seg([int12x_pos, int12y_pos], [int12x_pos, int12y_neg], rcirc)
+            area = a_sm
             #		  1________________4
             #		  |                |
             #     +++++                |
@@ -605,11 +680,12 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment
         elif vert1_outside and vert2_outside and vert3_inside and vert4_inside:
             # print 'case11'
-            A_sm = Circular_Seg([int41x_neg, int41y_pos], [int23x_neg, int23y_pos], rcirc)
-            A_tr1 = Triangle([int41x_neg, int41y_pos], [int23x_neg, int23y_pos], [vert3x_todo[i], vert3y_todo[i]])
-            A_tr2 = Triangle([vert4x_todo[i], vert4y_todo[i]], [int41x_neg, int41y_pos],
+            a_sm = circular_seg([int41x_neg, int41y_pos], [int23x_neg, int23y_pos], rcirc)
+            a_tr1 = triangle([int41x_neg, int41y_pos],
+                             [int23x_neg, int23y_pos], [vert3x_todo[i], vert3y_todo[i]])
+            a_tr2 = triangle([vert4x_todo[i], vert4y_todo[i]], [int41x_neg, int41y_pos],
                              [vert3x_todo[i], vert3y_todo[i]])
-            Area = A_sm + A_tr1 + A_tr2
+            area = a_sm + a_tr1 + a_tr2
             #          + + +
             #  1 ___+___4    +
             #  |   +    |     +
@@ -620,9 +696,10 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and two triangles
         elif vert1_outside and vert2_outside and vert4_outside and vert3_inside:
             # print 'case12'
-            A_sm = Circular_Seg([int23x_neg, int23y_pos], [int34x_pos, int34y_pos], rcirc)
-            A_tr = Triangle([int23x_neg, int23y_pos], [int34x_pos, int34y_pos], [vert3x_todo[i], vert3y_todo[i]])
-            Area = A_sm + A_tr
+            a_sm = circular_seg([int23x_neg, int23y_pos], [int34x_pos, int34y_pos], rcirc)
+            a_tr = triangle([int23x_neg, int23y_pos],
+                            [int34x_pos, int34y_pos], [vert3x_todo[i], vert3y_todo[i]])
+            area = a_sm + a_tr
             #  1______4
             #  |      |
             #  |      +++++
@@ -634,8 +711,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and triangle
         elif vert1_outside and vert2_outside and vert3_outside and vert4_outside and test23:
             # print 'case13'
-            A_sm = Circular_Seg([int23x_pos, int23y_pos], [int23x_neg, int23y_pos], rcirc)
-            Area = A_sm
+            a_sm = circular_seg([int23x_pos, int23y_pos], [int23x_neg, int23y_pos], rcirc)
+            area = a_sm
             # 1____________4
             # |			   |
             # |	           |
@@ -649,9 +726,10 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment
         elif vert1_outside and vert2_outside and vert3_outside and vert4_inside:
             # print 'case14'
-            A_sm = Circular_Seg([int41x_neg, int41y_pos], [int34x_pos, int34y_neg], rcirc)
-            A_tr = Triangle([int41x_neg, int41y_pos], [int34x_pos, int34y_neg], [vert4x_todo[i], vert4y_todo[i]])
-            Area = A_sm + A_tr
+            a_sm = circular_seg([int41x_neg, int41y_pos], [int34x_pos, int34y_neg], rcirc)
+            a_tr = triangle([int41x_neg, int41y_pos],
+                            [int34x_pos, int34y_neg], [vert4x_todo[i], vert4y_todo[i]])
+            area = a_sm + a_tr
             #       + + +
             #      +     +
             # 1___+___4   +
@@ -663,8 +741,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment and triangle
         elif vert1_outside and vert2_outside and vert3_outside and vert4_outside and test34:
             # print 'case15'
-            A_sm = Circular_Seg([int34x_pos, int34y_pos], [int34x_pos, int34y_neg], rcirc)
-            Area = A_sm
+            a_sm = circular_seg([int34x_pos, int34y_pos], [int34x_pos, int34y_neg], rcirc)
+            area = a_sm
             # 1_____________4
             # |             |
             # |          + + +
@@ -677,8 +755,8 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # --> Circle segment
         elif vert1_outside and vert2_outside and vert3_outside and vert4_outside and test41:
             # print 'case16'
-            A_sm = Circular_Seg([int41x_pos, int41y_pos], [int41x_neg, int41y_pos], rcirc)
-            Area = A_sm
+            a_sm = circular_seg([int41x_pos, int41y_pos], [int41x_neg, int41y_pos], rcirc)
+            area = a_sm
             #       ++++
             #     +      +
             #    +        +
@@ -691,10 +769,10 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
             # 2_____________3
             # --> Circle segment
         elif (vert1_outside and vert2_outside and vert3_outside and vert4_outside and not
-        test12 and not test23 and not test34 and not test41):
+             test12 and not test23 and not test34 and not test41):
             # print 'case17'
-            A_circ = np.pi * (rcirc ** 2)
-            Area = A_circ
+            a_circ = np.pi * (rcirc ** 2)
+            area = a_circ
             # 1_____________4
             # |     ++++    |
             # |   +      +  |
@@ -713,28 +791,28 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
         # and the area computed, put it all into a nested list
         output[0].append(xarr_todo[i])
         output[1].append(yarr_todo[i])
-        output[2].append(Area)
+        output[2].append(area)
         output[3].append(intersects)
 
     # Then do the much much simpler cases of the inner pixels (so we keep the whole area)...
-    inside_AA = []
+    inside_aa = []
     for i in xrange(inside_arr_todo.shape[0]):
-        Area = pix_sizex * pix_sizey
-        inside_AA.append(Area)
+        area = pix_sizex * pix_sizey
+        inside_aa.append(area)
     # And the pixels outside (so the area is always 0)
-    outside_AA = [0 for ii in outside_arr_todo]
+    outside_aa = [0 for ii in outside_arr_todo]
 
     # Shift the arrays back to their original location for plotting
-    xx, yy, AA, ints = output
-    xx = np.array(xx)
-    yy = np.array(yy)
-    xx += offsetx
-    yy += offsety
+    x_coords, y_coords, area_at_coord, ints = output
+    x_coords = np.array(x_coords)
+    y_coords = np.array(y_coords)
+    x_coords += offsetx
+    y_coords += offsety
 
-    inside_xx = np.array(x_inside_todo)
-    inside_yy = np.array(y_inside_todo)
-    inside_xx += offsetx
-    inside_yy += offsety
+    inside_x_coords = np.array(x_inside_todo)
+    inside_y_coords = np.array(y_inside_todo)
+    inside_x_coords += offsetx
+    inside_y_coords += offsety
 
     outside_xx = np.array(x_outside_todo)
     outside_yy = np.array(y_outside_todo)
@@ -743,23 +821,23 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
 
     if plot:
         # Plotting the pixels that cross the circle
-        for xi, yi, Ai, intersects in zip(xx, yy, AA, ints):
-            ax.scatter(xi, yi, square_size, c=Ai, marker='s', alpha=1.,
+        for x_i, y_i, a_i, intersects in zip(x_coords, y_coords, area_at_coord, ints):
+            axis.scatter(x_i, y_i, square_size, c=a_i, marker='s', alpha=1.,
                        vmax=pix_sizex * pix_sizey, vmin=0., linewidth=0)
 
         # Plotting the pixels fully inside the circle
-        for xi, yi, Ai in zip(inside_xx, inside_yy, inside_AA):
-            ax.scatter(xi, yi, square_size, c=Ai, marker='s', alpha=1.,
+        for x_i, y_i, a_i in zip(inside_x_coords, inside_y_coords, inside_aa):
+            axis.scatter(x_i, y_i, square_size, c=a_i, marker='s', alpha=1.,
                        vmax=pix_sizex * pix_sizey, vmin=0., linewidth=0)
 
         # Plotting the pixels fully inside the circle
-        for xi, yi, Ai in zip(outside_xx, outside_yy, outside_AA):
-            ax.scatter(xi, yi, square_size, c=Ai, marker='s', alpha=1.,
+        for x_i, y_i, a_i in zip(outside_xx, outside_yy, outside_aa):
+            axis.scatter(x_i, y_i, square_size, c=a_i, marker='s', alpha=1.,
                        vmax=pix_sizex * pix_sizey, vmin=0., linewidth=0)
 
-        ax.scatter(xarr_todo + offsetx, yarr_todo + offsety, 200, c='k', marker='.')
+        axis.scatter(xarr_todo + offsetx, yarr_todo + offsety, 200, c='k', marker='.')
         circ = plt.Circle([offsetx, offsety], rcirc, color='r', linewidth=3, fill=None)
-        ax.add_patch(circ)
+        axis.add_patch(circ)
 
         # savedir = os.path.dirname(os.path.abspath(__file__))
         savedir = '.'
@@ -768,15 +846,15 @@ def circular_aperture(arrs, circle_loc, rcirc, normalize=True, plot=False, plot_
         plt.savefig(saveloc)
 
     # Join all the arrays back together
-    all_x = list(xx)+list(outside_xx)+list(inside_xx)
-    all_y = list(yy)+list(outside_yy)+list(inside_yy)
-    all_A = list(AA)+list(outside_AA)+list(inside_AA)
+    all_x = list(x_coords)+list(outside_xx)+list(inside_x_coords)
+    all_y = list(y_coords)+list(outside_yy)+list(inside_y_coords)
+    all_a = list(area_at_coord)+list(outside_aa)+list(inside_aa)
 
     # If the fraction of the pixels is the desired output, normalise
-    tot_pix_area = inside_AA[0] # Just any inside pixel... it gives the total area of one pixel
+    tot_pix_area = inside_aa[0] # Just any inside pixel... it gives the total area of one pixel
     if normalize:
-        all_A = [all_Ai/tot_pix_area for all_Ai in all_A]
+        all_a = [all_Ai/tot_pix_area for all_Ai in all_a]
 
-        # for xi, yi, Ai in zip(all_x, all_y, all_A):
-        #     print xi, yi, Ai
-    return all_x, all_y, all_A
+        # for x_i, y_i, a_i in zip(all_x, all_y, all_a):
+        #     print x_i, y_i, a_i
+    return all_x, all_y, all_a
