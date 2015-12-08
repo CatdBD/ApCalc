@@ -1,10 +1,10 @@
 from distutils.core import setup
 
 setup(
-    name='Aperture_calculator',
+    name='ApCalc',
     version='0.0',
     packages=[''],
-    url='https://github.com/CatdBD/Aperture_calc',
+    url='https://github.com/CatdBD/ApCalc',
     license='',
     author='Catherine de Burgh-Day',
     author_email='catherine.dbd@gmail.com',
